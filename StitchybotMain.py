@@ -111,7 +111,6 @@ for tweet in tweets:
 	    	print("Invalid category, skipping tweet")
 	    cache.append(tweet.id)
 
-print("Recalculating scores...")
 for category in categories.container:
 	print(category.name + " Score: " + str(category.individualScore))
 
