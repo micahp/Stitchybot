@@ -6,6 +6,8 @@ import tempfile
 
 # Assuming StitchybotMain.py is in the same directory or accessible in PYTHONPATH
 from StitchybotMain import Category, Categories, StitchyBot, save_json_object, load_json_object, TwitterClient
+from ai_content_generator import AIContentGenerator # Import for testing
+import openai # For error types
 
 class TestCategory(unittest.TestCase):
     def test_category_creation(self):
@@ -438,6 +440,146 @@ class TestStitchyBot(unittest.TestCase):
         # To test that path, we'd make data.json invalid.
         
         self.assertListEqual(bot.cache, [], "Cache should be empty if cache.json was empty list.")
+
+
+class TestAIContentGenerator(unittest.TestCase):
+    DUMMY_API_KEY = "test_api_key_123"
+
+    def test_init_success(self):
+        with patch('ai_content_generator.openai.OpenAI') as MockOpenAIClientConstructor:
+            # Configure the constructor to return a MagicMock instance
+            mock_client_instance = MagicMock()
+            MockOpenAIClientConstructor.return_value = mock_client_instance
+            
+            generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
+            
+            self.assertIsNotNone(generator.client, "Client should be initialized.")
+            self.assertIs(generator.client, mock_client_instance, "Client should be the mocked instance.")
+            MockOpenAIClientConstructor.assert_called_once_with(
+                api_key=self.DUMMY_API_KEY,
+                base_url="https://api.together.xyz/v1"
+            )
+
+    def test_init_no_api_key(self):
+        with self.assertRaisesRegex(ValueError, "API key for AIContentGenerator cannot be None or empty."):
+            AIContentGenerator(api_key=None)
+        with self.assertRaisesRegex(ValueError, "API key for AIContentGenerator cannot be None or empty."):
+            AIContentGenerator(api_key="")
+
+    @patch('ai_content_generator.openai.OpenAI')
+    def test_generate_text_success(self, MockOpenAIClientConstructor):
+        mock_openai_client_instance = MagicMock()
+        MockOpenAIClientConstructor.return_value = mock_openai_client_instance
+        
+        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
+        
+        mock_completion_response = MagicMock()
+        mock_message = MagicMock()
+        mock_message.content = " Mocked AI suggestion " # With spaces to test strip()
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_completion_response.choices = [mock_choice]
+        
+        mock_openai_client_instance.chat.completions.create.return_value = mock_completion_response
+        
+        prompt = "test prompt for success"
+        result = generator.generate_text(prompt_text=prompt, model_name="test-model", max_tokens_suggestion=50, temperature=0.5)
+        
+        self.assertEqual(result, "Mocked AI suggestion", "The stripped content of the message should be returned.")
+        
+        mock_openai_client_instance.chat.completions.create.assert_called_once()
+        call_args = mock_openai_client_instance.chat.completions.create.call_args
+        
+        self.assertEqual(call_args.kwargs['model'], "test-model")
+        self.assertEqual(call_args.kwargs['max_tokens'], 50)
+        self.assertEqual(call_args.kwargs['temperature'], 0.5)
+        
+        expected_messages = [
+            {"role": "system", "content": "You are a helpful assistant that generates concise and engaging content based on the provided topic or keywords. Aim for content suitable for a tweet."},
+            {"role": "user", "content": prompt}
+        ]
+        self.assertEqual(call_args.kwargs['messages'], expected_messages)
+
+    # Helper for testing various error conditions
+    def _test_generate_text_api_error(self, error_to_raise, error_message_snippet, MockOpenAIClientConstructor):
+        mock_openai_client_instance = MagicMock()
+        MockOpenAIClientConstructor.return_value = mock_openai_client_instance
+        
+        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
+        
+        mock_openai_client_instance.chat.completions.create.side_effect = error_to_raise
+        
+        with patch('builtins.print') as mocked_print:
+            result = generator.generate_text("test prompt for error")
+            self.assertIsNone(result, "generate_text should return None on API error.")
+            
+            # Check if print was called with a message containing the error snippet
+            printed_error = False
+            for call in mocked_print.call_args_list:
+                if error_message_snippet in str(call.args[0]).lower():
+                    printed_error = True
+                    break
+            self.assertTrue(printed_error, f"Expected error message containing '{error_message_snippet}' not printed.")
+
+    @patch('ai_content_generator.openai.OpenAI')
+    def test_generate_text_api_connection_error(self, MockOpenAIClientConstructor):
+        self._test_generate_text_api_error(
+            openai.APIConnectionError(request=MagicMock()), # request arg is required for APIConnectionError
+            "network error connecting",
+            MockOpenAIClientConstructor
+        )
+
+    @patch('ai_content_generator.openai.OpenAI')
+    def test_generate_text_rate_limit_error(self, MockOpenAIClientConstructor):
+        self._test_generate_text_api_error(
+            openai.RateLimitError("rate limited", response=MagicMock(), body=None), # response and body are typical args
+            "rate limit exceeded",
+            MockOpenAIClientConstructor
+        )
+
+    @patch('ai_content_generator.openai.OpenAI')
+    def test_generate_text_api_status_error(self, MockOpenAIClientConstructor):
+        # Need to ensure the error object has status_code and response attributes
+        mock_response = MagicMock()
+        mock_response.status_code = 400 # Example status code
+        self._test_generate_text_api_error(
+            openai.APIStatusError("api status error", response=mock_response, body=None),
+            "api returned an error status",
+            MockOpenAIClientConstructor
+        )
+        
+    @patch('ai_content_generator.openai.OpenAI')
+    def test_generate_text_generic_api_error(self, MockOpenAIClientConstructor):
+        self._test_generate_text_api_error(
+            openai.APIError("generic api error"),
+            "unexpected error occurred with the together.ai api",
+            MockOpenAIClientConstructor
+        )
+
+    @patch('ai_content_generator.openai.OpenAI')
+    def test_generate_text_other_exception(self, MockOpenAIClientConstructor):
+        self._test_generate_text_api_error(
+            Exception("Some other unexpected error"),
+            "unexpected error occurred during text generation",
+            MockOpenAIClientConstructor
+        )
+
+    @patch('ai_content_generator.openai.OpenAI')
+    def test_generate_text_no_choices_in_response(self, MockOpenAIClientConstructor):
+        mock_openai_client_instance = MagicMock()
+        MockOpenAIClientConstructor.return_value = mock_openai_client_instance
+        
+        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
+        
+        mock_completion_response = MagicMock()
+        mock_completion_response.choices = [] # Empty choices list
+        
+        mock_openai_client_instance.chat.completions.create.return_value = mock_completion_response
+        
+        with patch('builtins.print') as mocked_print:
+            result = generator.generate_text("prompt for no choices")
+            self.assertIsNone(result, "Should return None if API response has no choices.")
+            mocked_print.assert_any_call("Error: No content generated. The response did not contain expected choices.")
 
 
 if __name__ == '__main__':

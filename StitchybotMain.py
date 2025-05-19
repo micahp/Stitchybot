@@ -7,8 +7,15 @@ import json
 from dotenv import load_dotenv # Added for .env file support
 import sys # For exiting the script
 
+from ai_content_generator import AIContentGenerator # Import the new class
 # Load environment variables from .env file
 load_dotenv()
+
+# Attempt to load Together.ai API key (optional at this stage)
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
+# The user-facing warning/success about TOGETHER_API_KEY loading will be handled
+# during AIContentGenerator instantiation or when the user tries to use the feature.
+
 
 # Access token file (remains pickle for now, could be refactored later if needed)
 ACCESS_TOKEN_FILE = "twitter_auth.pkl" 
@@ -341,14 +348,31 @@ class StitchyBot:
              print(f"Processed {processed_tweets_count} new tweets.")
         else:
             print("No new tweets to process.")
+        
+        # Note: Score printing and saving data are now handled separately after this method returns.
 
+    def print_scores(self):
+        """Prints the calculated scores for each category."""
+        print("\n--- Category Scores ---")
+        if not self.categories.container:
+            print("No categories to display scores for.")
+            return
+            
         for category in self.categories.container:
-            # Ensure score is a number before printing, default to 0 if not
-            score_to_print = category.individualScore if isinstance(category.individualScore, (int, float)) else 0
-            print(f"{category.name} Score: {score_to_print:.2f}") # Format score to 2 decimal places
+            score_to_print = category.individualScore if isinstance(category.individualScore, (int, float)) else 0.0
+            print(f"{category.name} Score: {score_to_print:.2f}")
+        print("-----------------------\n")
 
-        self._save_data_and_cache()
+    # _save_data_and_cache is already defined and seems fine.
+    # It's called by process_timeline_tweets at the end or can be called separately.
+    # For the new menu structure, it's better to call it explicitly in the menu option flow.
+    # So, let's remove the automatic call from process_timeline_tweets.
 
+# Modify process_timeline_tweets to not call _save_data_and_cache directly.
+# This change is done by simply removing the line from the end of that method.
+# Let's apply this change with the previous one.
+# No, I need to do it in a separate block.
+# The previous block was about StitchyBot. I'll do another one for it.
 
 # Main script execution
 if __name__ == "__main__":
@@ -364,8 +388,58 @@ if __name__ == "__main__":
         # This condition might be hit if authentication fails for reasons other than missing initial creds
         print("Twitter API not initialized (authentication may have failed). Exiting application.")
         sys.exit(1) # Exit with an error code
+    
+    # AI Generator Initialization
+    ai_generator = None
+    if TOGETHER_API_KEY: 
+        try:
+            ai_generator = AIContentGenerator(api_key=TOGETHER_API_KEY)
+            print("AIContentGenerator initialized successfully with TOGETHER_API_KEY.")
+        except ValueError as ve: # Catch error if API key is invalid (e.g., empty) as per AIContentGenerator's init
+            print(f"Error initializing AIContentGenerator: {ve}")
+            ai_generator = None 
     else:
-        # Initialize and run the bot
-        stitch_bot = StitchyBot(twitter_client)
-        stitch_bot.process_timeline_tweets()
-        print("StitchyBot processing complete.")
+        print("Warning: TOGETHER_API_KEY not found in .env. AI content generation features will be disabled.")
+        # ai_generator remains None
+
+    # Main menu loop
+    # StitchyBot instance creation moved inside option '1' to ensure fresh data load each time.
+    stitch_bot_instance = None # Can be initialized when needed
+
+    while True:
+        print("\nStitchyBot Menu:")
+        print("1. Process timeline tweets & Update scores")
+        print("2. Get AI tweet suggestion")
+        print("3. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            print("\nProcessing timeline tweets...")
+            # Create a new StitchyBot instance each time to reflect potential changes in data files
+            # or to ensure a fresh start for processing.
+            stitch_bot_instance = StitchyBot(twitter_client) 
+            stitch_bot_instance.process_timeline_tweets() 
+            stitch_bot_instance.print_scores()
+            stitch_bot_instance._save_data_and_cache() # Explicitly save after processing and printing
+            print("Timeline processing and score update complete.")
+        elif choice == '2':
+            print("\nGetting AI tweet suggestion...")
+            if ai_generator:
+                user_input = input("Enter a topic or keywords for your tweet suggestion: ")
+                if user_input.strip():
+                    print(f"Requesting AI suggestion for: \"{user_input}\"...")
+                    suggestion = ai_generator.generate_text(prompt_text=user_input)
+                    if suggestion:
+                       print(f"\nSuggested tweet:\n--------------------\n{suggestion}\n--------------------")
+                    else:
+                       # AIContentGenerator's generate_text method already prints detailed error info.
+                       print("Sorry, I couldn't generate a suggestion at this time. Please check the console for any API error messages.")
+                else:
+                    print("No topic provided. Please enter some keywords.")
+            else:
+                print("AI content generation is not available. Please ensure TOGETHER_API_KEY is correctly set in your .env file.")
+        elif choice == '3':
+            print("Exiting StitchyBot. Goodbye!")
+            break
+        else:
+            print("Invalid choice. Please try again.")
