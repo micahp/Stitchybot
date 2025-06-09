@@ -18,7 +18,7 @@ TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 
 
 # Access token file (remains pickle for now, could be refactored later if needed)
-ACCESS_TOKEN_FILE = "twitter_auth.pkl" 
+ACCESS_TOKEN_FILE = "twitter_auth.pkl"
 
 class TwitterClient:
     def __init__(self):
@@ -35,9 +35,9 @@ class TwitterClient:
             # For a more direct approach, __init__ cannot return a value to stop instantiation,
             # so the check must be done before instantiation or by the caller.
             # Let's make _authenticate return False on failure and check that.
-            self.initialization_failed = True 
+            self.initialization_failed = True
             return
-        
+
         self.initialization_failed = False
         self._authenticate()
 
@@ -74,16 +74,16 @@ class TwitterClient:
             try:
                 self.api.verify_credentials()
                 print("Credentials verified.")
-            except tweepy.TweepError as e:
+            except tweepy.errors.TweepyException as e: # Corrected exception type
                 print("Saved tokens are invalid or expired: {}".format(e))
                 self.api = None # Reset api
                 # Proceed to browser authentication
-        
+
         if not self.api: # If API not set up either due to no tokens or invalid tokens
             print("Attempting browser authentication...")
             try:
                 redirect_url = auth.get_authorization_url()
-            except tweepy.TweepError:
+            except tweepy.errors.TweepyException: # Corrected exception type
                 print('Error! Failed to get request token.')
                 return
 
@@ -95,10 +95,10 @@ class TwitterClient:
                 self._save_tokens(auth.access_token, auth.access_token_secret)
                 self.api = tweepy.API(auth)
                 print("Successfully authenticated via browser and tokens saved.")
-            except tweepy.TweepError:
+            except tweepy.errors.TweepyException: # Corrected exception type
                 print('Error! Failed to get access token.')
                 return
-        
+
         if not self.api:
             print("Authentication failed.")
 
@@ -148,20 +148,20 @@ class Category:
 		A bonus system is applied based on the number of tweets.
 		"""
 		num_tweets = len(self.retweetsList)
-		
+
 		# Determine the number of tweets that will get a bonus weighting
 		# If more than 3 tweets, the top 1/4th (integer division) get bonus, otherwise only 1 tweet gets bonus.
 		if num_tweets > 3:
 			# Example: 4 tweets -> 1 bonus tweet, 7 tweets -> 1 bonus tweet, 8 tweets -> 2 bonus tweets
-			bonus_tweet_count = num_tweets // 4 
+			bonus_tweet_count = num_tweets // 4
 		else:
 			bonus_tweet_count = 1
-		
+
 		initial_bonus_value = 3  # Starting bonus multiplier for the most recent tweet(s)
 		current_bonus = float(initial_bonus_value) # Use float for bonus calculation precision
-		
+
 		weighted_score_sum = 0
-		
+
 		# Iterate through retweets in reverse (most recent first)
 		for i, score in enumerate(reversed(self.retweetsList)):
 			weighted_score_sum += score * current_bonus
@@ -218,7 +218,7 @@ def save_json_object(obj, filename):
     data_to_save = obj
     if hasattr(obj, 'to_dict'):
         data_to_save = obj.to_dict()
-    
+
     try:
         with open(filename, 'w') as output_file: # Changed to 'w' for text mode
             json.dump(data_to_save, output_file, indent=4)
@@ -260,8 +260,8 @@ class StitchyBot:
 
     def __init__(self, twitter_client):
         self.twitter_client = twitter_client
-        self.categories = Categories() 
-        self.cache = [] 
+        self.categories = Categories()
+        self.cache = []
         self._load_data_and_cache()
 
     def _load_data_and_cache(self):
@@ -278,14 +278,14 @@ class StitchyBot:
 
 
         loaded_cache = load_json_object(self.CACHE_FILE)
-        if loaded_cache is not None: 
+        if loaded_cache is not None:
             print("Cache found, loading from JSON...")
             self.cache = loaded_cache # Cache is a list, loaded directly
         else:
             print(f"Cache file ({self.CACHE_FILE}) not found or error loading, creating new cache...")
             # self.cache is already initialized as [], so just need to save it
             save_json_object(self.cache, self.CACHE_FILE)
-            
+
     def _initialize_categories_from_file(self, filename):
         """Initializes categories from a text file (categories.txt)."""
         # This method now populates the existing self.categories object
@@ -320,7 +320,7 @@ class StitchyBot:
             return
 
         print("Incrementing category retweets...")
-        tweets = self.twitter_client.user_timeline() 
+        tweets = self.twitter_client.user_timeline()
 
         if not tweets:
             print("No tweets fetched or timeline is empty.")
@@ -332,7 +332,7 @@ class StitchyBot:
                 if tweet.text and len(tweet.text) > 0:
                     category_tag = tweet.text[0]
                     current_category = self.categories.getCategory(category_tag)
-                    
+
                     if current_category:
                         current_category.incrementRetweets(tweet.retweet_count)
                         self.categories.total += tweet.retweet_count # Assuming this total is still desired
@@ -343,12 +343,12 @@ class StitchyBot:
                 else:
                     print(f"Tweet ID {tweet.id} has no text or is empty, skipping.")
                 self.cache.append(tweet.id)
-        
+
         if processed_tweets_count > 0:
              print(f"Processed {processed_tweets_count} new tweets.")
         else:
             print("No new tweets to process.")
-        
+
         # Note: Score printing and saving data are now handled separately after this method returns.
 
     def print_scores(self):
@@ -357,7 +357,7 @@ class StitchyBot:
         if not self.categories.container:
             print("No categories to display scores for.")
             return
-            
+
         for category in self.categories.container:
             score_to_print = category.individualScore if isinstance(category.individualScore, (int, float)) else 0.0
             print(f"{category.name} Score: {score_to_print:.2f}")
@@ -378,26 +378,28 @@ class StitchyBot:
 if __name__ == "__main__":
     # Initialize Twitter client
     twitter_client = TwitterClient()
-    
+
     # Check if TwitterClient initialization failed due to missing credentials
     if twitter_client.initialization_failed:
         print("Exiting application due to missing Twitter API credentials.")
         sys.exit(1) # Exit with an error code
-    
+
     if not twitter_client.api:
         # This condition might be hit if authentication fails for reasons other than missing initial creds
-        print("Twitter API not initialized (authentication may have failed). Exiting application.")
-        sys.exit(1) # Exit with an error code
-    
+        # For this manual test of AI features, we will allow proceeding to the menu.
+        # Features requiring Twitter API will be degraded.
+        print("Warning: Twitter API not initialized (authentication may have failed). Features requiring Twitter will be degraded.")
+        # sys.exit(1) # Commented out to allow menu access for AI testing
+
     # AI Generator Initialization
     ai_generator = None
-    if TOGETHER_API_KEY: 
+    if TOGETHER_API_KEY:
         try:
             ai_generator = AIContentGenerator(api_key=TOGETHER_API_KEY)
             print("AIContentGenerator initialized successfully with TOGETHER_API_KEY.")
         except ValueError as ve: # Catch error if API key is invalid (e.g., empty) as per AIContentGenerator's init
             print(f"Error initializing AIContentGenerator: {ve}")
-            ai_generator = None 
+            ai_generator = None
     else:
         print("Warning: TOGETHER_API_KEY not found in .env. AI content generation features will be disabled.")
         # ai_generator remains None
@@ -417,8 +419,8 @@ if __name__ == "__main__":
             print("\nProcessing timeline tweets...")
             # Create a new StitchyBot instance each time to reflect potential changes in data files
             # or to ensure a fresh start for processing.
-            stitch_bot_instance = StitchyBot(twitter_client) 
-            stitch_bot_instance.process_timeline_tweets() 
+            stitch_bot_instance = StitchyBot(twitter_client)
+            stitch_bot_instance.process_timeline_tweets()
             stitch_bot_instance.print_scores()
             stitch_bot_instance._save_data_and_cache() # Explicitly save after processing and printing
             print("Timeline processing and score update complete.")

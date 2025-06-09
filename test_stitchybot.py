@@ -7,7 +7,7 @@ import tempfile
 # Assuming StitchybotMain.py is in the same directory or accessible in PYTHONPATH
 from StitchybotMain import Category, Categories, StitchyBot, save_json_object, load_json_object, TwitterClient
 from ai_content_generator import AIContentGenerator # Import for testing
-import openai # For error types
+import together # Changed from openai to together, for error types
 
 class TestCategory(unittest.TestCase):
     def test_category_creation(self):
@@ -23,7 +23,7 @@ class TestCategory(unittest.TestCase):
         category.individualScore = 120
         category.retweetsTotal = 15
         category.retweetsList = [5, 10]
-        
+
         category_dict = category.to_dict()
         expected_dict = {
             'name': "Tech",
@@ -33,7 +33,7 @@ class TestCategory(unittest.TestCase):
             'retweetsList': [5, 10]
         }
         self.assertDictEqual(category_dict, expected_dict, "Category to_dict serialization failed.")
-        
+
         new_category = Category.from_dict(expected_dict)
         self.assertEqual(new_category.name, "Tech")
         self.assertEqual(new_category.key, "T")
@@ -46,7 +46,7 @@ class TestCategory(unittest.TestCase):
         category.incrementRetweets(10)
         self.assertEqual(category.retweetsTotal, 10, "Retweets total should be 10 after first increment.")
         self.assertListEqual(category.retweetsList, [10], "Retweets list should contain [10].")
-        
+
         category.incrementRetweets(5)
         self.assertEqual(category.retweetsTotal, 15, "Retweets total should be 15 after second increment.")
         self.assertListEqual(category.retweetsList, [10, 5], "Retweets list should contain [10, 5].")
@@ -73,7 +73,7 @@ class TestCategory(unittest.TestCase):
         # Tweet 1 (score 10): uses bonus 3.0. reduction_step = (3.0-1.0)/1 = 2.0. bonus becomes 1.0
         category.calculateScore()
         self.assertAlmostEqual(category.individualScore, 30.0, places=1, msg="Score calculation for single retweet is incorrect.")
-        
+
         category.retweetsList = [10, 20, 5] # Most recent is 5
         # Expected: (5 * 3.0) + (20*1.0) + (10*1.0) = 15 + 20 + 10 = 45.0
         # Tweet 1 (score 5): uses bonus 3.0. reduction_step = (3.0-1.0)/1 = 2.0. bonus becomes 1.0
@@ -129,15 +129,15 @@ class TestCategories(unittest.TestCase):
         categories = Categories()
         cat1 = Category(name="General", key="G")
         cat2 = Category(name="Specific", key="S")
-        
+
         categories.addCategory(cat1)
         self.assertEqual(len(categories.container), 1, "Container should have 1 category after adding one.")
         self.assertIs(categories.getCategory("G"), cat1, "Should retrieve category G.")
-        
+
         categories.addCategory(cat2)
         self.assertEqual(len(categories.container), 2, "Container should have 2 categories after adding two.")
         self.assertIs(categories.getCategory("S"), cat2, "Should retrieve category S.")
-        
+
         self.assertIsNone(categories.getCategory("X"), "Should return None for a non-existent category key.")
 
     def test_categories_to_from_dict(self):
@@ -146,39 +146,39 @@ class TestCategories(unittest.TestCase):
         cat1.individualScore = 50
         cat1.retweetsTotal = 5
         cat1.retweetsList = [2,3]
-        
+
         cat2 = Category(name="Work", key="W")
         cat2.individualScore = 100
         cat2.retweetsTotal = 10
         cat2.retweetsList = [4,6]
-        
+
         categories.addCategory(cat1)
         categories.addCategory(cat2)
         categories.total = 150 # Example total, though not directly used in from_dict in current StitchyBotMain
-        
+
         categories_dict = categories.to_dict()
         expected_dict = {
             'categories': [cat1.to_dict(), cat2.to_dict()],
-            'total': 150 
+            'total': 150
         }
         self.assertEqual(len(categories_dict['categories']), 2)
         self.assertDictEqual(categories_dict['categories'][0], cat1.to_dict(), "First category dict mismatch.")
         self.assertDictEqual(categories_dict['categories'][1], cat2.to_dict(), "Second category dict mismatch.")
         self.assertEqual(categories_dict['total'], 150, "Total mismatch in dict.")
-        
+
         new_categories = Categories.from_dict(expected_dict)
         self.assertEqual(len(new_categories.container), 2, "Should load 2 categories.")
         self.assertEqual(new_categories.total, 150, "Total should be loaded correctly.")
-        
+
         # Check integrity of loaded categories
         loaded_cat1 = new_categories.getCategory("F")
         loaded_cat2 = new_categories.getCategory("W")
-        
+
         self.assertIsNotNone(loaded_cat1, "Loaded category F should not be None.")
         self.assertEqual(loaded_cat1.name, "Fun")
         self.assertEqual(loaded_cat1.individualScore, 50)
         self.assertEqual(loaded_cat1.retweetsList, [2,3])
-        
+
         self.assertIsNotNone(loaded_cat2, "Loaded category W should not be None.")
         self.assertEqual(loaded_cat2.name, "Work")
         self.assertEqual(loaded_cat2.individualScore, 100)
@@ -204,12 +204,12 @@ class TestDataHandling(unittest.TestCase):
         cat1.individualScore = 10
         categories_obj.addCategory(cat1)
         categories_obj.total = 10
-        
+
         file_path = os.path.join(self.test_dir.name, "test_categories.json")
-        
+
         save_json_object(categories_obj, file_path)
         self.assertTrue(os.path.exists(file_path), "JSON file should be created.")
-        
+
         loaded_obj = load_json_object(file_path, target_class=Categories)
         self.assertIsNotNone(loaded_obj, "Loaded object should not be None.")
         self.assertIsInstance(loaded_obj, Categories, "Loaded object should be a Categories instance.")
@@ -221,10 +221,10 @@ class TestDataHandling(unittest.TestCase):
     def test_save_and_load_json_object_list_cache(self):
         cache_list = [123, 456, 789]
         file_path = os.path.join(self.test_dir.name, "test_cache.json")
-        
+
         save_json_object(cache_list, file_path)
         self.assertTrue(os.path.exists(file_path), "JSON file for cache should be created.")
-        
+
         loaded_list = load_json_object(file_path)
         self.assertIsNotNone(loaded_list, "Loaded list should not be None.")
         self.assertIsInstance(loaded_list, list, "Loaded object should be a list.")
@@ -237,12 +237,12 @@ class TestDataHandling(unittest.TestCase):
             loaded_obj = load_json_object(file_path)
             self.assertIsNone(loaded_obj, "Should return None for a non-existent file.")
             mocked_print.assert_any_call(f"File {file_path} not found.")
-            
+
     def test_load_json_object_corrupt_json(self):
         file_path = os.path.join(self.test_dir.name, "corrupt.json")
         with open(file_path, "w") as f:
             f.write("{'name': 'test', 'key': 't'") # Intentionally malformed JSON
-        
+
         with patch('builtins.print') as mocked_print:
             loaded_obj = load_json_object(file_path, target_class=Category)
             self.assertIsNone(loaded_obj, "Should return None for corrupt JSON.")
@@ -258,7 +258,7 @@ class TestStitchyBot(unittest.TestCase):
         # Create a temporary directory for StitchyBot's data files (data.json, cache.json)
         # and for categories.txt if needed for a specific test.
         self.test_dir = tempfile.TemporaryDirectory()
-        
+
         # Define paths for StitchyBot's data files within the temp directory
         self.data_json_path = os.path.join(self.test_dir.name, "data.json")
         self.cache_json_path = os.path.join(self.test_dir.name, "cache.json")
@@ -267,7 +267,7 @@ class TestStitchyBot(unittest.TestCase):
         # Patch the class constants in StitchyBot to use these temp paths
         self.patch_data_file = patch.object(StitchyBot, 'DATA_FILE', self.data_json_path)
         self.patch_cache_file = patch.object(StitchyBot, 'CACHE_FILE', self.cache_json_path)
-        
+
         self.patch_data_file.start()
         self.patch_cache_file.start()
 
@@ -281,7 +281,7 @@ class TestStitchyBot(unittest.TestCase):
         with open(self.categories_txt_path, "w") as f:
             f.write("Alpha Category A\n") # Key 'A'
             f.write("Beta Category B\n")  # Key 'B'
-        
+
         # StitchyBot's _load_data_and_cache calls _initialize_categories_from_file
         # if data.json is not found. We need to ensure data.json doesn't exist initially.
         if os.path.exists(self.data_json_path):
@@ -293,33 +293,33 @@ class TestStitchyBot(unittest.TestCase):
         # The actual _initialize_categories_from_file method takes the filename.
         # We need to ensure that *when StitchyBot initializes*, it reads from our temp categories.txt
         # This happens if data.json is not found.
-        
+
         # We will let _load_data_and_cache try to load non-existent data.json,
         # then it should call _initialize_categories_from_file with 'categories.txt'.
         # We need to patch the call to _initialize_categories_from_file to use our temp path,
         # or patch the default 'categories.txt' path if it's hardcoded.
         # In StitchyBotMain, _initialize_categories_from_file is called with 'categories.txt'.
         # So, let's patch 'open' for that specific call during initialization.
-        
+
         # The easiest is to ensure 'categories.txt' is in the test_dir and StitchyBot
         # can pick it up if its working directory were test_dir.
         # Or, more robustly, patch its _initialize_categories_from_file method
         # to use the self.categories_txt_path.
-        
+
         # Let's assume default 'categories.txt' path. For testing, we can patch 'open' globally for this.
         # This is tricky because load_dotenv also uses open.
         # A better way: StitchyBot calls _initialize_categories_from_file('categories.txt')
         # We can patch *that* method to make it read from our specific temp categories.txt.
-        
+
         # Simpler: The current implementation of StitchyBot calls `_initialize_categories_from_file('categories.txt')`.
         # We can just create `categories.txt` in the current working directory for the test.
         # Or, even better, mock the `_initialize_categories_from_file` method itself.
-        
+
         # For this test, let's test the actual _initialize_categories_from_file method.
         # And then test the higher-level _load_data_and_cache.
 
         bot = StitchyBot(self.mock_twitter_client) # This will trigger _load_data_and_cache
-        
+
         # Check if data.json was created from categories.txt
         self.assertTrue(os.path.exists(self.data_json_path))
         loaded_categories_from_json = load_json_object(self.data_json_path, Categories)
@@ -335,7 +335,7 @@ class TestStitchyBot(unittest.TestCase):
         # Setup categories in the bot (simulating they were loaded or initialized)
         cat_t = Category("Tech News", "T")
         cat_s = Category("Sports News", "S")
-        
+
         # We need to ensure data.json is pre-populated for this test,
         # or that _initialize_categories_from_file is called and populates correctly.
         # Let's pre-populate data.json for directness.
@@ -343,18 +343,18 @@ class TestStitchyBot(unittest.TestCase):
         initial_categories.addCategory(cat_t)
         initial_categories.addCategory(cat_s)
         save_json_object(initial_categories, self.data_json_path)
-        
+
         # Initial empty cache
         save_json_object([], self.cache_json_path)
 
         bot = StitchyBot(self.mock_twitter_client) # Loads the above data.json and cache.json
-        
+
         # Mock Twitter API response
         mock_tweet1 = MagicMock()
         mock_tweet1.id = 101
         mock_tweet1.text = "TThis is a tech tweet."
         mock_tweet1.retweet_count = 10
-        
+
         mock_tweet2 = MagicMock()
         mock_tweet2.id = 102
         mock_tweet2.text = "SSports update here!"
@@ -364,30 +364,30 @@ class TestStitchyBot(unittest.TestCase):
         mock_tweet3_unknown_cat.id = 103
         mock_tweet3_unknown_cat.text = "XUnknown category."
         mock_tweet3_unknown_cat.retweet_count = 20
-        
+
         mock_tweet4_cached = MagicMock() # This tweet ID will be in cache
         mock_tweet4_cached.id = 100 # Assume this ID is already in cache
         mock_tweet4_cached.text = "TAnother tech tweet, but cached."
         mock_tweet4_cached.retweet_count = 7
-        
+
         bot.cache = [100] # Pre-populate cache for one tweet
 
         self.mock_twitter_client.user_timeline.return_value = [mock_tweet1, mock_tweet2, mock_tweet3_unknown_cat, mock_tweet4_cached]
-        
+
         bot.process_timeline_tweets()
-        
+
         # Verify tweet processing
         processed_cat_t = bot.categories.getCategory("T")
         processed_cat_s = bot.categories.getCategory("S")
-        
+
         self.assertEqual(len(processed_cat_t.retweetsList), 1, "Tech category should have 1 new retweet.")
         self.assertEqual(processed_cat_t.retweetsList[0], 10, "Tech category retweet count mismatch.")
         self.assertTrue(processed_cat_t.individualScore > 0, "Tech category score should be updated.")
-        
+
         self.assertEqual(len(processed_cat_s.retweetsList), 1, "Sports category should have 1 new retweet.")
         self.assertEqual(processed_cat_s.retweetsList[0], 5, "Sports category retweet count mismatch.")
         self.assertTrue(processed_cat_s.individualScore > 0, "Sports category score should be updated.")
-        
+
         # Verify cache update
         self.assertIn(101, bot.cache, "Tweet ID 101 should be added to cache.")
         self.assertIn(102, bot.cache, "Tweet ID 102 should be added to cache.")
@@ -407,13 +407,13 @@ class TestStitchyBot(unittest.TestCase):
         categories_to_save.addCategory(cat_existing)
         categories_to_save.total = 100
         save_json_object(categories_to_save, self.data_json_path)
-        
+
         # Prepare dummy cache.json
         cache_to_save = [999, 888]
         save_json_object(cache_to_save, self.cache_json_path)
-        
+
         bot = StitchyBot(self.mock_twitter_client) # This will load the files
-        
+
         self.assertEqual(len(bot.categories.container), 1, "Should load 1 category from existing data.json.")
         self.assertEqual(bot.categories.getCategory("E").name, "Existing")
         self.assertEqual(bot.categories.total, 100)
@@ -423,77 +423,94 @@ class TestStitchyBot(unittest.TestCase):
         # Create empty but valid JSON files
         save_json_object({}, self.data_json_path) # Empty object for categories
         save_json_object([], self.cache_json_path) # Empty list for cache
-        
+
         # Need categories.txt for initialization if data.json is considered invalid/empty by from_dict
         with open(self.categories_txt_path, "w") as f:
             f.write("Default Cat D\n")
 
         bot = StitchyBot(self.mock_twitter_client)
-        
+
         # Current Categories.from_dict expects 'categories' key. Empty {} will lead to empty container.
         # If data.json is empty JSON object `{}`, from_dict will result in an empty Categories object.
         # StitchyBot's _load_data_and_cache considers this "loaded" (not None)
         # but it will be empty. This is different from file not found.
         self.assertEqual(len(bot.categories.container), 0, "Categories should be empty if data.json was empty object.")
-        
+
         # If data.json was truly empty or malformed, then _initialize_categories_from_file would run.
         # To test that path, we'd make data.json invalid.
-        
+
         self.assertListEqual(bot.cache, [], "Cache should be empty if cache.json was empty list.")
 
 
 class TestAIContentGenerator(unittest.TestCase):
     DUMMY_API_KEY = "test_api_key_123"
 
-    def test_init_success(self):
-        with patch('ai_content_generator.openai.OpenAI') as MockOpenAIClientConstructor:
-            # Configure the constructor to return a MagicMock instance
-            mock_client_instance = MagicMock()
-            MockOpenAIClientConstructor.return_value = mock_client_instance
-            
-            generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
-            
-            self.assertIsNotNone(generator.client, "Client should be initialized.")
-            self.assertIs(generator.client, mock_client_instance, "Client should be the mocked instance.")
-            MockOpenAIClientConstructor.assert_called_once_with(
-                api_key=self.DUMMY_API_KEY,
-                base_url="https://api.together.xyz/v1"
-            )
+    @patch('ai_content_generator.os.getenv') # Mock getenv for one test case
+    @patch('ai_content_generator.together.Together')
+    def test_init_success_with_api_key_param(self, MockTogetherClientConstructor, mock_getenv):
+        mock_client_instance = MagicMock()
+        MockTogetherClientConstructor.return_value = mock_client_instance
 
-    def test_init_no_api_key(self):
-        with self.assertRaisesRegex(ValueError, "API key for AIContentGenerator cannot be None or empty."):
-            AIContentGenerator(api_key=None)
-        with self.assertRaisesRegex(ValueError, "API key for AIContentGenerator cannot be None or empty."):
-            AIContentGenerator(api_key="")
-
-    @patch('ai_content_generator.openai.OpenAI')
-    def test_generate_text_success(self, MockOpenAIClientConstructor):
-        mock_openai_client_instance = MagicMock()
-        MockOpenAIClientConstructor.return_value = mock_openai_client_instance
-        
         generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
-        
+
+        self.assertIsNotNone(generator.client, "Client should be initialized.")
+        self.assertIs(generator.client, mock_client_instance, "Client should be the mocked instance.")
+        MockTogetherClientConstructor.assert_called_once_with(api_key=self.DUMMY_API_KEY)
+        mock_getenv.assert_not_called() # Ensure getenv wasn't called when api_key is provided
+
+    @patch('ai_content_generator.os.getenv')
+    @patch('ai_content_generator.together.Together')
+    def test_init_success_with_env_variable(self, MockTogetherClientConstructor, mock_getenv):
+        mock_client_instance = MagicMock()
+        MockTogetherClientConstructor.return_value = mock_client_instance
+        mock_getenv.return_value = self.DUMMY_API_KEY
+
+        generator = AIContentGenerator() # No API key passed, should use env var
+
+        self.assertIsNotNone(generator.client)
+        self.assertIs(generator.client, mock_client_instance)
+        MockTogetherClientConstructor.assert_called_once_with(api_key=self.DUMMY_API_KEY)
+        mock_getenv.assert_called_once_with("TOGETHER_API_KEY")
+
+    @patch('ai_content_generator.os.getenv')
+    def test_init_no_api_key_provided_or_in_env(self, mock_getenv):
+        mock_getenv.return_value = None # Simulate API key not in environment
+        with self.assertRaisesRegex(ValueError, "TOGETHER_API_KEY not found in environment or passed to constructor."):
+            AIContentGenerator() # No API key passed and not in env
+        mock_getenv.assert_called_once_with("TOGETHER_API_KEY")
+
+    def test_init_empty_api_key_param(self):
+         with self.assertRaisesRegex(ValueError, "TOGETHER_API_KEY not found in environment or passed to constructor."):
+            AIContentGenerator(api_key="") # Empty string passed
+
+    @patch('ai_content_generator.together.Together') # Patch the new client
+    def test_generate_text_success(self, MockTogetherClientConstructor):
+        mock_together_client_instance = MagicMock()
+        MockTogetherClientConstructor.return_value = mock_together_client_instance
+
+        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY) # Still need API key for generator init
+
         mock_completion_response = MagicMock()
         mock_message = MagicMock()
-        mock_message.content = " Mocked AI suggestion " # With spaces to test strip()
+        mock_message.content = " Mocked AI suggestion "
         mock_choice = MagicMock()
         mock_choice.message = mock_message
         mock_completion_response.choices = [mock_choice]
-        
-        mock_openai_client_instance.chat.completions.create.return_value = mock_completion_response
-        
+
+        mock_together_client_instance.chat.completions.create.return_value = mock_completion_response
+
         prompt = "test prompt for success"
         result = generator.generate_text(prompt_text=prompt, model_name="test-model", max_tokens_suggestion=50, temperature=0.5)
-        
-        self.assertEqual(result, "Mocked AI suggestion", "The stripped content of the message should be returned.")
-        
-        mock_openai_client_instance.chat.completions.create.assert_called_once()
-        call_args = mock_openai_client_instance.chat.completions.create.call_args
-        
+
+        self.assertEqual(result, "Mocked AI suggestion")
+
+        mock_together_client_instance.chat.completions.create.assert_called_once()
+        call_args = mock_together_client_instance.chat.completions.create.call_args
+
         self.assertEqual(call_args.kwargs['model'], "test-model")
         self.assertEqual(call_args.kwargs['max_tokens'], 50)
         self.assertEqual(call_args.kwargs['temperature'], 0.5)
-        
+
         expected_messages = [
             {"role": "system", "content": "You are a helpful assistant that generates concise and engaging content based on the provided topic or keywords. Aim for content suitable for a tweet."},
             {"role": "user", "content": prompt}
@@ -501,18 +518,18 @@ class TestAIContentGenerator(unittest.TestCase):
         self.assertEqual(call_args.kwargs['messages'], expected_messages)
 
     # Helper for testing various error conditions
-    def _test_generate_text_api_error(self, error_to_raise, error_message_snippet, MockOpenAIClientConstructor):
-        mock_openai_client_instance = MagicMock()
-        MockOpenAIClientConstructor.return_value = mock_openai_client_instance
-        
-        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
-        
-        mock_openai_client_instance.chat.completions.create.side_effect = error_to_raise
-        
+    def _test_generate_text_api_error(self, error_to_raise, error_message_snippet, MockTogetherClientConstructor):
+        mock_together_client_instance = MagicMock()
+        MockTogetherClientConstructor.return_value = mock_together_client_instance
+
+        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY) # Init generator
+
+        mock_together_client_instance.chat.completions.create.side_effect = error_to_raise
+
         with patch('builtins.print') as mocked_print:
             result = generator.generate_text("test prompt for error")
             self.assertIsNone(result, "generate_text should return None on API error.")
-            
+
             # Check if print was called with a message containing the error snippet
             printed_error = False
             for call in mocked_print.call_args_list:
@@ -521,61 +538,52 @@ class TestAIContentGenerator(unittest.TestCase):
                     break
             self.assertTrue(printed_error, f"Expected error message containing '{error_message_snippet}' not printed.")
 
-    @patch('ai_content_generator.openai.OpenAI')
-    def test_generate_text_api_connection_error(self, MockOpenAIClientConstructor):
+    @patch('ai_content_generator.together.Together')
+    def test_generate_text_authentication_error(self, MockTogetherClientConstructor):
+        # This error type is from the `together` package
         self._test_generate_text_api_error(
-            openai.APIConnectionError(request=MagicMock()), # request arg is required for APIConnectionError
-            "network error connecting",
-            MockOpenAIClientConstructor
+            together.AuthenticationError("auth error"),
+            "authentication error with together.ai api", # Updated message check
+            MockTogetherClientConstructor
         )
 
-    @patch('ai_content_generator.openai.OpenAI')
-    def test_generate_text_rate_limit_error(self, MockOpenAIClientConstructor):
+    @patch('ai_content_generator.together.Together')
+    def test_generate_text_rate_limit_error(self, MockTogetherClientConstructor):
         self._test_generate_text_api_error(
-            openai.RateLimitError("rate limited", response=MagicMock(), body=None), # response and body are typical args
+            together.RateLimitError("rate limited"),
             "rate limit exceeded",
-            MockOpenAIClientConstructor
+            MockTogetherClientConstructor
         )
 
-    @patch('ai_content_generator.openai.OpenAI')
-    def test_generate_text_api_status_error(self, MockOpenAIClientConstructor):
-        # Need to ensure the error object has status_code and response attributes
-        mock_response = MagicMock()
-        mock_response.status_code = 400 # Example status code
+    @patch('ai_content_generator.together.Together')
+    def test_generate_text_generic_api_error(self, MockTogetherClientConstructor):
+        # Using together.APIError as a general catch-all for other API issues
         self._test_generate_text_api_error(
-            openai.APIStatusError("api status error", response=mock_response, body=None),
-            "api returned an error status",
-            MockOpenAIClientConstructor
-        )
-        
-    @patch('ai_content_generator.openai.OpenAI')
-    def test_generate_text_generic_api_error(self, MockOpenAIClientConstructor):
-        self._test_generate_text_api_error(
-            openai.APIError("generic api error"),
-            "unexpected error occurred with the together.ai api",
-            MockOpenAIClientConstructor
+            together.APIError("generic api error from together"),
+            "an api error occurred with the together.ai api", # Updated message check
+            MockTogetherClientConstructor
         )
 
-    @patch('ai_content_generator.openai.OpenAI')
-    def test_generate_text_other_exception(self, MockOpenAIClientConstructor):
+    @patch('ai_content_generator.together.Together')
+    def test_generate_text_other_exception(self, MockTogetherClientConstructor):
         self._test_generate_text_api_error(
-            Exception("Some other unexpected error"),
-            "unexpected error occurred during text generation",
-            MockOpenAIClientConstructor
+            Exception("Some other unexpected error"), # Standard Python exception
+            "unexpected error occurred during text generation", # This message is from AIContentGenerator
+            MockTogetherClientConstructor
         )
 
-    @patch('ai_content_generator.openai.OpenAI')
-    def test_generate_text_no_choices_in_response(self, MockOpenAIClientConstructor):
-        mock_openai_client_instance = MagicMock()
-        MockOpenAIClientConstructor.return_value = mock_openai_client_instance
-        
-        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY)
-        
+    @patch('ai_content_generator.together.Together')
+    def test_generate_text_no_choices_in_response(self, MockTogetherClientConstructor):
+        mock_together_client_instance = MagicMock()
+        MockTogetherClientConstructor.return_value = mock_together_client_instance
+
+        generator = AIContentGenerator(api_key=self.DUMMY_API_KEY) # Init generator
+
         mock_completion_response = MagicMock()
-        mock_completion_response.choices = [] # Empty choices list
-        
-        mock_openai_client_instance.chat.completions.create.return_value = mock_completion_response
-        
+        mock_completion_response.choices = []
+
+        mock_together_client_instance.chat.completions.create.return_value = mock_completion_response
+
         with patch('builtins.print') as mocked_print:
             result = generator.generate_text("prompt for no choices")
             self.assertIsNone(result, "Should return None if API response has no choices.")
